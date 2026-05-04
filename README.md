@@ -49,6 +49,33 @@ npm install
 npm start
 ```
 
+## Deployment
+
+This project is designed for deployment on platforms that support Python backends with ML models.
+
+### Recommended: Railway
+
+Railway provides the best support for this type of application.
+
+1. Create account at [railway.app](https://railway.app)
+2. Install Railway CLI: `npm install -g @railway/cli`
+3. Login: `railway login`
+4. Initialize: `railway init`
+5. Deploy: `railway up`
+
+The project includes `requirements.txt`, `Procfile`, and `railway.json` for easy deployment.
+
+### Other Options
+
+See `DEPLOYMENT.md` for detailed instructions on Railway, Render, and Heroku deployment.
+
+### Vercel Limitations
+
+Vercel is not suitable for this project because:
+- No Python runtime for ML models
+- Limited storage and compute resources
+- Cannot handle video processing workloads
+
 ## Notes
 
 - Keep your model weights in the `models/` folder, especially `yolov8n.pt`, `fight_detection.pt`, and `accident_detection.pt`.
