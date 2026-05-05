@@ -67,8 +67,7 @@ CROWD_CRITICAL = 30
 CROWD_DENSITY_THRESH = 0.30   
 
 # ── General ──────────────────────────────────────────────────────
-CONF_THRESHOLD = 0.35   # object / accident confidence gate
-
+CONF_THRESHOLD = 0.35   # object / accident confidence gateTARGET_ANALYSIS_FPS = 3  # analyze at most this many frames per second
 #  PATHS
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -260,8 +259,10 @@ def analyze_video(video_path, progress_callback=None):
     fps          = cap.get(cv2.CAP_PROP_FPS) or 25
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 1
 
-    frame_index  = 0
-    second_data  = {}          # best event per second
+    frame_index      = 0
+    processed_frames = 0
+    frame_skip       = max(1, int(round(fps / TARGET_ANALYSIS_FPS)))
+    second_data      = {}          # best event per second
 
     # ── Temporal fight voting ──────────────────────────────────────
     fight_vote_window = deque(maxlen=FIGHT_TEMPORAL_WINDOW)
@@ -281,6 +282,10 @@ def analyze_video(video_path, progress_callback=None):
         if progress_callback:
             progress_callback(frame_index / total_frames)
 
+        if frame_index % frame_skip != 0:
+            continue
+
+        processed_frames += 1
         frame = cv2.resize(frame, (320, 320))
         frame_h, frame_w = frame.shape[:2]
 
