@@ -8,7 +8,7 @@ import json
 import asyncio
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from backend.video_analyzer import analyze_video
+from video_analyzer import analyze_video
 
 app = FastAPI()
 
