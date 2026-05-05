@@ -66,6 +66,8 @@ Railway provides the best support for this type of application.
 The project includes `requirements.txt`, `Procfile`, `railway.json`, and a `Dockerfile` for deployment.
 The `Dockerfile` installs necessary system libraries for OpenCV in headless mode and is the recommended deployment path.
 
+> Note: The project now uses CPU-only PyTorch wheels via `torch==2.11.0+cpu` and `torchvision==0.16.0+cpu` to avoid downloading large CUDA packages during deployment.
+
 ### Other Options
 
 See `DEPLOYMENT.md` for detailed instructions on Railway, Render, and Heroku deployment.

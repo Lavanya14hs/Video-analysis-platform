@@ -1,6 +1,9 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
 fastapi
 uvicorn[standard]
 ultralytics
 numpy
 python-multipart
 opencv-python-headless==4.13.0.92
+torch==2.11.0+cpu
+torchvision==0.16.0+cpu
