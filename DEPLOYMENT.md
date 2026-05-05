@@ -14,6 +14,7 @@ Railway supports Python backends with ML models and provides persistent storage.
 ### Required files for Railway:
 - `requirements.txt` (Python dependencies)
 - `Procfile` or `railway.json` for startup
+- `Dockerfile` for system libraries and OpenCV support
 - Environment variables for any secrets
 
 ## Option 2: Render

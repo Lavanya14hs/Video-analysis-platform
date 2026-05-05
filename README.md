@@ -63,7 +63,8 @@ Railway provides the best support for this type of application.
 4. Initialize: `railway init`
 5. Deploy: `railway up`
 
-The project includes `requirements.txt`, `Procfile`, and `railway.json` for easy deployment.
+The project includes `requirements.txt`, `Procfile`, `railway.json`, and a `Dockerfile` for deployment.
+The `Dockerfile` installs necessary system libraries for OpenCV in headless mode and is the recommended deployment path.
 
 ### Other Options
 
