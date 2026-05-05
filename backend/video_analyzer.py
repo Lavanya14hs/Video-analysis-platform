@@ -12,8 +12,16 @@ OBJECT_MODEL_PATH   = "yolov8n.pt"
 FIGHT_MODEL_PATH    = "models/fight_detection.pt"
 ACCIDENT_MODEL_PATH = "models/accident_detection.pt"
 
-object_model = YOLO(OBJECT_MODEL_PATH)
+# Load object detection model (download if not present)
+try:
+    object_model = YOLO(OBJECT_MODEL_PATH)
+    print(f"✅ Loaded object detection model: {OBJECT_MODEL_PATH}")
+except Exception as e:
+    print(f"⚠️  Object model not found, downloading YOLOv8n: {e}")
+    object_model = YOLO('yolov8n.pt')  # This will download the model
+    print("✅ Downloaded and loaded YOLOv8n model")
 
+# Load fight detection model (optional)
 try:
     fight_model = YOLO(FIGHT_MODEL_PATH)
     # ── Detect whether the fight model is a CLASSIFIER or a DETECTOR ──
@@ -23,13 +31,18 @@ try:
     _dummy = np.zeros((320, 320, 3), dtype=np.uint8)
     _test  = fight_model(_dummy, verbose=False)[0]
     FIGHT_MODEL_IS_CLASSIFIER = _test.probs is not None
-except Exception:
+    print(f"✅ Loaded fight detection model: {FIGHT_MODEL_PATH}")
+except Exception as e:
+    print(f"⚠️  Fight model not found, fight detection disabled: {e}")
     fight_model = None
     FIGHT_MODEL_IS_CLASSIFIER = False
 
+# Load accident detection model (optional)
 try:
     accident_model = YOLO(ACCIDENT_MODEL_PATH)
-except Exception:
+    print(f"✅ Loaded accident detection model: {ACCIDENT_MODEL_PATH}")
+except Exception as e:
+    print(f"⚠️  Accident model not found, accident detection disabled: {e}")
     accident_model = None
 
 #  CONFIG

@@ -51,7 +51,7 @@ temp/
 *.h5
 *.pb
 models/
-yolov8n.pt
+# yolov8n.pt  # Allow this standard model to be committed
 
 # Dataset files (large)
 *.zip
