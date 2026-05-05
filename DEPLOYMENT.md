@@ -1,6 +1,26 @@
 # Deployment Guide
 
-## Option 1: Railway (Recommended for Full-Stack)
+## Option 1: Render (Recommended - Simplest)
+
+Render supports full-stack applications with persistent disks and is the easiest to set up.
+
+### Steps:
+1. Create account at [render.com](https://render.com)
+2. Connect your GitHub repository (or import this one)
+3. Click "New +" and select "Web Service"
+4. Configure:
+   - **Name**: `video-analysis-platform`
+   - **Environment**: Docker
+   - **Build Command**: `docker build -t myapp .`
+   - **Start Command**: `uvicorn api.main:app --host 0.0.0.0 --port 8000`
+5. Deploy and get your live URL
+
+### Or use render.yaml:
+If the repo has `render.yaml`, Render will auto-detect it:
+1. Connect your GitHub repo
+2. Render auto-deploys on push
+
+## Option 2: Railway (More Complex)
 
 Railway supports Python backends with ML models and provides persistent storage.
 
@@ -11,22 +31,7 @@ Railway supports Python backends with ML models and provides persistent storage.
 4. Initialize: `railway init`
 5. Deploy: `railway up`
 
-### Required files for Railway:
-- `requirements.txt` (Python dependencies)
-- `Procfile` or `railway.json` for startup
-- `Dockerfile` for system libraries and OpenCV support
-- Environment variables for any secrets
-
-## Option 2: Render
-
-Render supports full-stack applications with persistent disks.
-
-### Steps:
-1. Create account at [render.com](https://render.com)
-2. Connect your GitHub repository
-3. Create a Web Service for the backend
-4. Create a Static Site for the frontend
-5. Configure environment variables
+**Note**: Railway requires careful environment variable handling with Docker.
 
 ## Option 3: Heroku
 
