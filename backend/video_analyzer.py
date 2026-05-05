@@ -67,7 +67,9 @@ CROWD_CRITICAL = 30
 CROWD_DENSITY_THRESH = 0.30   
 
 # ── General ──────────────────────────────────────────────────────
-CONF_THRESHOLD = 0.35   # object / accident confidence gateTARGET_ANALYSIS_FPS = 3  # analyze at most this many frames per second
+CONF_THRESHOLD = 0.35   # object / accident confidence gate
+TARGET_ANALYSIS_FPS = 3  # analyze at most this many frames per second
+
 #  PATHS
 ROOT = Path(__file__).resolve().parents[1]
 
