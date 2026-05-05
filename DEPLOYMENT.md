@@ -11,11 +11,16 @@ Render supports full-stack applications with persistent disks and is the easiest
 4. Configure:
    - **Name**: `video-analysis-platform`
    - **Environment**: Docker
-   - **Build Command**: `docker build -t myapp .`
-   - **Start Command**: `uvicorn api.main:app --host 0.0.0.0 --port 8000`
+   - **Build Command**: leave blank
+   - **Start Command**: `uvicorn api.main:app --host 0.0.0.0 --port $PORT`
 5. Deploy and get your live URL
 
-### Or use render.yaml:
+### Or use `render.yaml`:
+This repo now includes `render.yaml` at the repository root so Render can auto-detect the service configuration.
+- `root`: `backend`
+- `dockerfilePath`: `Dockerfile`
+- `startCommand`: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+
 If the repo has `render.yaml`, Render will auto-detect it:
 1. Connect your GitHub repo
 2. Render auto-deploys on push
