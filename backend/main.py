@@ -27,8 +27,8 @@ UPLOAD_DIR = BASE_DIR / "temp"
 UPLOAD_DIR.mkdir(exist_ok=True)
 
 
-@app.get("/")
-def home():
+@app.get("/health")
+def health():
     return {"message": "API Running 🚀"}
 
 
