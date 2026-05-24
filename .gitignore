@@ -50,8 +50,10 @@ temp/
 *.onnx
 *.h5
 *.pb
-models/
-# yolov8n.pt  # Allow this standard model to be committed
+# models/
+!backend/models/fight_detection.pt
+!backend/models/accident_detection.pt
+!backend/models/fire_smoke.pt
 
 # Dataset files (large)
 *.zip

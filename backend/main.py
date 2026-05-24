@@ -75,7 +75,15 @@ async def analyze_stream(file: UploadFile = File(...)):
             except OSError:
                 pass
 
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
+    )
 
 
 # Serve static files from the built React frontend
