@@ -6,24 +6,26 @@ from datetime import datetime
 from collections import Counter, deque
 
 from ultralytics import YOLO
-#  MODELS
 
-OBJECT_MODEL_PATH   = "yolov8n.pt"
-FIGHT_MODEL_PATH    = "models/fight_detection.pt"
-ACCIDENT_MODEL_PATH = "models/accident_detection.pt"
+#  PATHS
+BACKEND_DIR = Path(__file__).resolve().parent
+OBJECT_MODEL_PATH   = BACKEND_DIR / "yolov8n.pt"
+FIGHT_MODEL_PATH    = BACKEND_DIR / "models" / "fight_detection.pt"
+ACCIDENT_MODEL_PATH = BACKEND_DIR / "models" / "accident_detection.pt"
+FIRE_MODEL_PATH     = BACKEND_DIR / "models" / "fire_smoke.pt"
 
 # Load object detection model (download if not present)
 try:
-    object_model = YOLO(OBJECT_MODEL_PATH)
+    object_model = YOLO(str(OBJECT_MODEL_PATH))
     print(f"✅ Loaded object detection model: {OBJECT_MODEL_PATH}")
 except Exception as e:
     print(f"⚠️  Object model not found, downloading YOLOv8n: {e}")
-    object_model = YOLO('yolov8n.pt')  # This will download the model
+    object_model = YOLO(str(OBJECT_MODEL_PATH))  # This will download the model into backend dir
     print("✅ Downloaded and loaded YOLOv8n model")
 
 # Load fight detection model (optional)
 try:
-    fight_model = YOLO(FIGHT_MODEL_PATH)
+    fight_model = YOLO(str(FIGHT_MODEL_PATH))
     # ── Detect whether the fight model is a CLASSIFIER or a DETECTOR ──
     # Classification models expose `.names` as a flat list/dict of class names
     # and their results have `.probs` instead of `.boxes`.
@@ -39,11 +41,27 @@ except Exception as e:
 
 # Load accident detection model (optional)
 try:
-    accident_model = YOLO(ACCIDENT_MODEL_PATH)
+    accident_model = YOLO(str(ACCIDENT_MODEL_PATH))
     print(f"✅ Loaded accident detection model: {ACCIDENT_MODEL_PATH}")
 except Exception as e:
     print(f"⚠️  Accident model not found, accident detection disabled: {e}")
     accident_model = None
+
+# Load fire/smoke detection model (optional)
+try:
+    fire_model = YOLO(str(FIRE_MODEL_PATH))
+    print(f"✅ Loaded fire/smoke model: {FIRE_MODEL_PATH}")
+    # detect classifier vs detector
+    try:
+        _dummy = np.zeros((320, 320, 3), dtype=np.uint8)
+        _test = fire_model(_dummy, verbose=False)[0]
+        FIRE_MODEL_IS_CLASSIFIER = _test.probs is not None
+    except Exception:
+        FIRE_MODEL_IS_CLASSIFIER = False
+except Exception as e:
+    print(f"⚠️  Fire/smoke model not found, fire detection disabled: {e}")
+    fire_model = None
+    FIRE_MODEL_IS_CLASSIFIER = False
 
 #  CONFIG
 # ── Fight detection ──────────────────────────────────────────────
@@ -69,9 +87,7 @@ CROWD_DENSITY_THRESH = 0.30
 # ── General ──────────────────────────────────────────────────────
 CONF_THRESHOLD = 0.35   # object / accident confidence gate
 TARGET_ANALYSIS_FPS = 3  # analyze at most this many frames per second
-
-#  PATHS
-ROOT = Path(__file__).resolve().parents[1]
+FIRE_CONF_MIN = 0.35    # fire/smoke detection confidence gate
 
 #  HELPERS
 
@@ -225,6 +241,7 @@ def generate_report(alerts):
     fight_count    = sum(1 for a in alerts if a["fight"])
     accident_count = sum(1 for a in alerts if a["accident"])
     crowd_count    = sum(1 for a in alerts if a.get("crowd"))
+    fire_count     = sum(1 for a in alerts if a.get("fire_events"))
 
     summary = f"""
 🚨 INCIDENT REPORT
@@ -233,6 +250,7 @@ Total Events   : {len(alerts)}
 🔥 Fights      : {fight_count}
 🚗 Accidents   : {accident_count}
 👥 Crowd Alerts: {crowd_count}
+ 🔥/💨 Fires     : {fire_count}
 
 """
     for a in alerts:
@@ -245,6 +263,10 @@ Total Events   : {len(alerts)}
             )
         if a["accident"]:
             summary += f"\n🚗 {t} — Accident ({a['accident_type']})"
+        if a.get("fire"):
+            conf_pct = int(a.get("fire_conf", 0) * 100)
+            label = a.get("fire_label", "fire/smoke")
+            summary += f"\n🔥 {t} — {label.title()} detected (conf {conf_pct}%)"
         if a.get("crowd"):
             summary += (
                 f"\n👥 {t} — {a['crowd_level']} "
@@ -255,7 +277,7 @@ Total Events   : {len(alerts)}
 
 #  MAIN
 
-def analyze_video(video_path, progress_callback=None):
+def analyze_video(video_path, progress_callback=None, debug=False):
 
     cap = cv2.VideoCapture(video_path)
     fps          = cap.get(cv2.CAP_PROP_FPS) or 25
@@ -310,6 +332,7 @@ def analyze_video(video_path, progress_callback=None):
         labels          = []
         person_count    = 0
         person_boxes    = []
+        object_boxes    = []
         vehicle_present = False
 
         for box, cls, conf in zip(raw_boxes, class_ids, conf_scores):
@@ -321,10 +344,19 @@ def analyze_video(video_path, progress_callback=None):
             if label == "person":
                 person_count += 1
                 person_boxes.append(box.tolist())
+                try:
+                    bx1, by1, bx2, by2 = map(int, box)
+                    object_boxes.append(((bx1, by1, bx2, by2), 'person'))
+                except Exception:
+                    pass
 
             if label in ["car", "motorcycle", "truck", "bus"]:
                 vehicle_present = True
-
+                try:
+                    bx1, by1, bx2, by2 = map(int, box)
+                    object_boxes.append(((bx1, by1, bx2, by2), label))
+                except Exception:
+                    pass
         if not labels:
             prev_gray = curr_gray
             continue
@@ -385,7 +417,7 @@ def analyze_video(video_path, progress_callback=None):
             last_fight_second = current_second
 
         #  ACCIDENT DETECTION
-        
+        accident_boxes = []
         accident_alert = False
         accident_conf  = 0.0
         accident_type  = ""
@@ -401,6 +433,7 @@ def analyze_video(video_path, progress_callback=None):
                         accident_conf  = conf
 
                         x1, y1, x2, y2 = map(int, b.xyxy[0])
+                        accident_boxes.append((x1, y1, x2, y2, float(conf)))
                         involved = []
                         for box, cls in zip(raw_boxes, class_ids):
                             label = object_model.names[int(cls)]
@@ -410,6 +443,61 @@ def analyze_video(video_path, progress_callback=None):
                                     involved.append(label)
                         involved      = list(set(involved))
                         accident_type = " vs ".join(involved) if len(involved) >= 2 else "Unknown"
+
+        #  FIRE / SMOKE DETECTION
+        fire_boxes = []
+        fire_alert = False
+        fire_conf  = 0.0
+        fire_label = ""
+        fire_events = []
+
+        if fire_model is not None:
+            try:
+                fres = fire_model(frame, verbose=False)[0]
+                if debug:
+                    # show classifier/detector summary for debugging
+                    if getattr(fres, 'probs', None) is not None:
+                        print(f"[DEBUG] fire_model classifier top1={fres.probs.top1} conf={float(fres.probs.top1conf):.3f}")
+                    elif getattr(fres, 'boxes', None) is not None and fres.boxes.conf is not None:
+                        confs = fres.boxes.conf.cpu().numpy()
+                        print(f"[DEBUG] fire_model detector boxes={len(confs)} max_conf={float(confs.max()):.3f}")
+                # Classifier branch
+                if 'FIRE_MODEL_IS_CLASSIFIER' in globals() and FIRE_MODEL_IS_CLASSIFIER:
+                    if getattr(fres, 'probs', None) is not None:
+                        top1 = int(fres.probs.top1)
+                        top1conf = float(fres.probs.top1conf)
+                        cname = (fres.names.get(top1, '') or '').lower()
+                        if top1conf >= FIRE_CONF_MIN and any(k in cname for k in ('fire', 'smoke', 'flame')):
+                            fire_alert = True
+                            fire_conf = top1conf
+                            fire_label = cname
+                            fire_events.append(cname.title() if cname else 'Fire')
+                else:
+                    # Detector branch
+                    if fres.boxes is not None:
+                        f_xy = fres.boxes.xyxy.cpu().numpy()
+                        f_conf = fres.boxes.conf.cpu().numpy()
+                        try:
+                            f_cls = fres.boxes.cls.cpu().numpy()
+                        except Exception:
+                            f_cls = [None] * len(f_conf)
+
+                        for (x1, y1, x2, y2), conf, cls in zip(f_xy, f_conf, f_cls):
+                            label = (fres.names.get(int(cls), '') if cls is not None else '').lower()
+                            if conf > FIRE_CONF_MIN and any(k in label for k in ('fire', 'smoke', 'flame')):
+                                fire_alert = True
+                                fire_conf = max(fire_conf, float(conf))
+                                fire_label = label or 'fire/smoke'
+                                if fire_label.title() not in fire_events:
+                                    fire_events.append(fire_label.title())
+                                try:
+                                    fire_boxes.append((int(x1), int(y1), int(x2), int(y2), float(conf), fire_label))
+                                except Exception:
+                                    pass
+            except Exception as e:
+                if debug:
+                    print(f"[DEBUG] fire_model error: {e}")
+                pass
 
         #  CROWD DETECTION
         crowd_alert   = False
@@ -427,11 +515,11 @@ def analyze_video(video_path, progress_callback=None):
             )
 
         #  RECORD EVENT
-        if not (fight_alert or accident_alert or crowd_alert):
+        if not (fight_alert or accident_alert or crowd_alert or fire_alert):
             prev_gray = curr_gray
             continue
 
-        best_score = max(fight_conf, accident_conf, density_score)
+        best_score = max(fight_conf, accident_conf, density_score, fire_conf)
 
         if current_second not in second_data or second_data[current_second]["score"] < best_score:
 
@@ -439,10 +527,52 @@ def analyze_video(video_path, progress_callback=None):
             video_time = round(frame_index / fps, 2)
             time_str   = f"{int(video_time // 60)}:{int(video_time % 60):02d}"
 
+            # Create annotated snapshot and save to logs/snapshots
             snapshot_uri = None
-            success, encoded = cv2.imencode(".jpg", frame)
-            if success:
-                snapshot_uri = "data:image/jpeg;base64," + base64.b64encode(encoded.tobytes()).decode("ascii")
+            snapshot_path = None
+            try:
+                snap_dir = BACKEND_DIR.parent / "logs" / "snapshots"
+                snap_dir.mkdir(parents=True, exist_ok=True)
+
+                vis = frame.copy()
+
+                # draw object-level boxes
+                for item in object_boxes:
+                    try:
+                        (bx1, by1, bx2, by2), lbl = item
+                        color = (0, 255, 0) if lbl == 'person' else (255, 0, 0)
+                        cv2.rectangle(vis, (bx1, by1), (bx2, by2), color, 1)
+                        cv2.putText(vis, lbl, (bx1, max(by1 - 4, 0)), cv2.FONT_HERSHEY_SIMPLEX, 0.35, color, 1)
+                    except Exception:
+                        pass
+
+                # draw accident boxes
+                for (x1, y1, x2, y2, conf) in (accident_boxes if 'accident_boxes' in locals() else []):
+                    try:
+                        cv2.rectangle(vis, (x1, y1), (x2, y2), (0, 0, 255), 2)
+                        cv2.putText(vis, f"accident {int(conf*100)}%", (x1, max(y1 - 6, 0)), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0,0,255), 1)
+                    except Exception:
+                        pass
+
+                # draw fire boxes
+                for (x1, y1, x2, y2, conf, flabel) in (fire_boxes if 'fire_boxes' in locals() else []):
+                    try:
+                        cv2.rectangle(vis, (x1, y1), (x2, y2), (0, 140, 255), 2)
+                        cv2.putText(vis, f"{flabel} {int(conf*100)}%", (x1, max(y1 - 6, 0)), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0,140,255), 1)
+                    except Exception:
+                        pass
+
+                fname = f"event_{current_second}_{int(best_score*1000)}.jpg"
+                fpath = snap_dir / fname
+                cv2.imwrite(str(fpath), vis)
+                snapshot_path = str(fpath)
+
+                success, encoded = cv2.imencode('.jpg', vis)
+                if success:
+                    snapshot_uri = "data:image/jpeg;base64," + base64.b64encode(encoded.tobytes()).decode('ascii')
+            except Exception:
+                snapshot_uri = None
+                snapshot_path = None
 
             second_data[current_second] = {
                 "timestamp"    : timestamp,
@@ -455,6 +585,11 @@ def analyze_video(video_path, progress_callback=None):
                 # accident
                 "accident"     : accident_alert,
                 "accident_type": accident_type,
+                # fire
+                "fire"         : fire_alert,
+                "fire_conf"    : round(fire_conf, 3),
+                "fire_label"   : fire_label,
+                "fire_events"  : fire_events,
                 # crowd
                 "crowd"        : crowd_alert,
                 "crowd_level"  : crowd_level,
@@ -463,6 +598,7 @@ def analyze_video(video_path, progress_callback=None):
                 "density_score": round(density_score, 3),
                 # meta
                 "snapshot"     : snapshot_uri,
+                "snapshot_path": snapshot_path,
                 "score"        : best_score,
                 "flow_mag"     : round(flow_mag, 2),
             }
