@@ -87,7 +87,7 @@ CROWD_DENSITY_THRESH = 0.30
 # ── General ──────────────────────────────────────────────────────
 CONF_THRESHOLD = 0.35   # object / accident confidence gate
 TARGET_ANALYSIS_FPS = 3  # analyze at most this many frames per second
-FIRE_CONF_MIN = 0.35    # fire/smoke detection confidence gate
+FIRE_CONF_MIN = 0.20    # fire/smoke detection confidence gate
 
 #  HELPERS
 
@@ -484,6 +484,7 @@ def analyze_video(video_path, progress_callback=None, debug=False):
 
                         for (x1, y1, x2, y2), conf, cls in zip(f_xy, f_conf, f_cls):
                             label = (fres.names.get(int(cls), '') if cls is not None else '').lower()
+                            print(f"[FIRE_MODEL] Frame {frame_index}: Detected '{label}' with confidence {conf:.3f}")
                             if conf > FIRE_CONF_MIN and any(k in label for k in ('fire', 'smoke', 'flame')):
                                 fire_alert = True
                                 fire_conf = max(fire_conf, float(conf))
