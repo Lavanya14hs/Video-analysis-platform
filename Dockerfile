@@ -1,4 +1,4 @@
-﻿# Stage 1: Build React Frontend
+# Stage 1: Build React Frontend
 FROM node:18-alpine AS frontend-builder
 
 WORKDIR /app/frontend
@@ -29,6 +29,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxrender1 \
     libxext6 \
     libxcb1 \
+    libgl1 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
